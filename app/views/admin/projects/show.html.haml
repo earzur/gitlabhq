@@ -77,6 +77,14 @@
           SSH:
       %td
         = link_to @project.ssh_url_to_repo
+  - if @project.external_tracker_pattern
+    %tr
+      %td
+        %b
+          External tracker pattern:
+      %td
+        = link_to @project.external_tracker_pattern
+
   - if @project.public
     %tr.bgred
       %td
