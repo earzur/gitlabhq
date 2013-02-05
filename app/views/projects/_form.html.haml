@@ -13,7 +13,10 @@
     .clearfix
       = f.label :default_branch, "Default Branch"
       .input= f.select(:default_branch, @repository.heads.map(&:name), {}, style: "width:210px;")
-
+  .clearfix
+    = f.label :external_tracker do
+      Optional tracker URL
+    .input= f.text_field :external_tracker_pattern, placeholder: "http://bugzilla.test.com/show_bug.cgi?id=%d", class: "xxlarge"
 
   %fieldset.features
     %legend Features:
