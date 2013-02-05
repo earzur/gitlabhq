@@ -32,6 +32,11 @@
       .input= f.check_box :issues_enabled
 
     .clearfix
+      = f.label :external_tracker do
+        Optional tracker URL
+      .input= f.text_field :external_tracker_pattern, placeholder: "http://bugzilla.test.com/show_bug.cgi?id=%d", class: "xxlarge"
+
+    .clearfix
       = f.label :merge_requests_enabled, "Merge Requests"
       .input= f.check_box :merge_requests_enabled
 
