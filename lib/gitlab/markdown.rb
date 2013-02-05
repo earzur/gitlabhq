@@ -92,15 +92,15 @@ module Gitlab
     end
 
     REFERENCE_PATTERN = %r{
-      (?<prefix>\W)?                         # Prefix
-      (                                      # Reference
-         @(?<user>[a-zA-Z][a-zA-Z0-9_\-\.]*) # User name
-        |\#(?<issue>\d+)                     # Issue ID
-        |!(?<merge_request>\d+)              # MR ID
-        |\$(?<snippet>\d+)                   # Snippet ID
-        |(?<commit>[\h]{6,40})               # Commit ID
+      (?<prefix>\W)?                                        # Prefix
+      (                                                     # Reference
+         @(?<user>[a-zA-Z][a-zA-Z0-9_\-\.]*)                # User name
+        |(?<text>((?i)((bug)|(issue))\s*)|\#)(?<issue>\d+)  # Issue ID  (Issue 232, bUg     129, #322 ...)
+        |!(?<merge_request>\d+)                             # MR ID
+        |\$(?<snippet>\d+)                                  # Snippet ID
+        |(?<commit>[\h]{6,40})                              # Commit ID
       )
-      (?<suffix>\W)?                         # Suffix
+      (?<suffix>\W)?                                        # Suffix
     }x.freeze
 
     TYPES = [:user, :issue, :merge_request, :snippet, :commit].freeze
@@ -112,11 +112,12 @@ module Gitlab
         suffix     = $~[:suffix]
         type       = TYPES.select{|t| !$~[t].nil?}.first
         identifier = $~[type]
+        text       = $~[:text]
 
         # Avoid HTML entities
         if prefix && suffix && prefix[0] == '&' && suffix[-1] == ';'
           match
-        elsif ref_link = reference_link(type, identifier)
+        elsif ref_link = reference_link(type, identifier,text)
           "#{prefix}#{ref_link}#{suffix}"
         else
           match
@@ -152,35 +153,37 @@ module Gitlab
     # identifier - Object identifier (Issue ID, SHA hash, etc.)
     #
     # Returns string rendered by the processing method
-    def reference_link(type, identifier)
-      send("reference_#{type}", identifier)
+    def reference_link(type, identifier,text)
+      send("reference_#{type}", identifier,text)
     end
 
-    def reference_user(identifier)
+    def reference_user(identifier,text)
       if member = @project.users_projects.joins(:user).where(users: { username: identifier }).first
         link_to("@#{identifier}", project_team_member_url(@project, member), html_options.merge(class: "gfm gfm-team_member #{html_options[:class]}")) if member
       end
     end
 
-    def reference_issue(identifier)
-      if issue = @project.issues.where(id: identifier).first
-        link_to("##{identifier}", project_issue_url(@project, issue), html_options.merge(title: "Issue: #{issue.title}", class: "gfm gfm-issue #{html_options[:class]}"))
+    def reference_issue(identifier,text)
+      if @project.issues_enabled && issue = @project.issues.where(id: identifier).first
+        link_to("#{text}#{identifier}", project_issue_url(@project, issue), html_options.merge(title: "Issue: #{issue.title}", class: "gfm gfm-issue #{html_options[:class]}"))
+      elsif @project.external_tracker_pattern
+        link_to("#{text}#{identifier}", @project.external_tracker_pattern % identifier,html_options.merge(class: "gfm gfm-issue #{html_options[:class]}"))
       end
     end
 
-    def reference_merge_request(identifier)
+    def reference_merge_request(identifier,text)
       if merge_request = @project.merge_requests.where(id: identifier).first
         link_to("!#{identifier}", project_merge_request_url(@project, merge_request), html_options.merge(title: "Merge Request: #{merge_request.title}", class: "gfm gfm-merge_request #{html_options[:class]}"))
       end
     end
 
-    def reference_snippet(identifier)
+    def reference_snippet(identifier,text)
       if snippet = @project.snippets.where(id: identifier).first
         link_to("$#{identifier}", project_snippet_url(@project, snippet), html_options.merge(title: "Snippet: #{snippet.title}", class: "gfm gfm-snippet #{html_options[:class]}"))
       end
     end
 
-    def reference_commit(identifier)
+    def reference_commit(identifier,text)
       if @project.valid_repo? && commit = @project.repository.commit(identifier)
         link_to(identifier, project_commit_url(@project, commit), html_options.merge(title: CommitDecorator.new(commit).link_title, class: "gfm gfm-commit #{html_options[:class]}"))
       end
